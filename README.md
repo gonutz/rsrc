@@ -8,6 +8,7 @@ http://github.com/gonutz/rsrc
 
 # Usage
 
+```
 rsrc [-manifest FILE.exe.manifest] [-ico FILE.ico[,FILE2.ico...]] -o FILE.syso
   Generates a .syso file with specified resources embedded in .rsrc section,
   aimed for consumption by Go linker when building Win32 excecutables.
@@ -29,3 +30,4 @@ OPTIONS:
         path to a Windows manifest file to embed
   -o string
         name of output COFF (.res or .syso) file (default "rsrc.syso")
+```
