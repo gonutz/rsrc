@@ -23,6 +23,12 @@ If you build for multiple architectures, name your rsrc files accordingly, e.g.
 rsrc_386.syso and rsrc_amd64.syso to have the Go compiler use the right one
 depending on the current GOOS.
 
+The mapping of input files to their resource IDs is printed as Go code to
+stdout. You can save the output to a .go file which will contain a
+  var exeIDs = map[string]uint16
+which you can access at runtime to retrieve the resource ID for each embedded
+file.
+
 OPTIONS:
 `
 
