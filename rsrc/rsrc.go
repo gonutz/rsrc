@@ -28,7 +28,11 @@ type _GRPICONDIRENTRY struct {
 	Id uint16
 }
 
-func Embed(fnameout, arch, fnamein, fnameico string) error {
+// Embed returns a map of the resource files to their final IDs in the .syso
+// file.
+func Embed(outPath, arch, manifestPath, icoPath string) (map[string]uint16, error) {
+	ids := make(map[string]uint16)
+
 	lastid := uint16(0)
 	newid := func() uint16 {
 		lastid++
@@ -38,53 +42,54 @@ func Embed(fnameout, arch, fnamein, fnameico string) error {
 	out := coff.NewRSRC()
 	err := out.Arch(arch)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	if fnamein != "" {
-		manifest, err := binutil.SizedOpen(fnamein)
+	if manifestPath != "" {
+		manifest, err := binutil.SizedOpen(manifestPath)
 		if err != nil {
-			return fmt.Errorf("rsrc: error opening manifest file '%s': %s", fnamein, err)
+			return nil, fmt.Errorf("rsrc: error opening manifest file '%s': %s", manifestPath, err)
 		}
 		defer manifest.Close()
 
 		id := newid()
 		out.AddResource(coff.RT_MANIFEST, id, manifest)
-		// TODO(akavel): reintroduce the Printlns in package main after Embed returns
-		// fmt.Println("Manifest ID: ", id)
+		ids[manifestPath] = id
 	}
-	if fnameico != "" {
-		for _, fnameicosingle := range strings.Split(fnameico, ",") {
-			f, err := addIcon(out, fnameicosingle, newid)
+	if icoPath != "" {
+		for _, icon := range strings.Split(icoPath, ",") {
+			f, iconID, err := addIcon(out, icon, newid)
 			if err != nil {
-				return err
+				return nil, err
 			}
+			ids[icon] = iconID
 			defer f.Close()
 		}
 	}
 
 	out.Freeze()
 
-	return internal.Write(out, fnameout)
+	return ids, internal.Write(out, outPath)
 }
 
-func addIcon(out *coff.Coff, fname string, newid func() uint16) (io.Closer, error) {
+func addIcon(out *coff.Coff, fname string, newid func() uint16) (io.Closer, uint16, error) {
 	f, err := os.Open(fname)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 
 	icons, err := ico.DecodeHeaders(f)
 	if err != nil {
 		f.Close()
-		return nil, err
+		return nil, 0, err
 	}
 
+	var iconID uint16
 	if len(icons) > 0 {
 		// RT_ICONs
 		group := _GRPICONDIR{ICONDIR: ico.ICONDIR{
-			Reserved: 0, // magic num.
-			Type:     1, // magic num.
+			Reserved: 0,
+			Type:     1,
 			Count:    uint16(len(icons)),
 		}}
 		for _, icon := range icons {
@@ -93,11 +98,9 @@ func addIcon(out *coff.Coff, fname string, newid func() uint16) (io.Closer, erro
 			out.AddResource(coff.RT_ICON, id, r)
 			group.Entries = append(group.Entries, _GRPICONDIRENTRY{icon.IconDirEntryCommon, id})
 		}
-		id := newid()
-		out.AddResource(coff.RT_GROUP_ICON, id, group)
-		// TODO(akavel): reintroduce the Printlns in package main after Embed returns
-		// fmt.Println("Icon ", fname, " ID: ", id)
+		iconID = newid()
+		out.AddResource(coff.RT_GROUP_ICON, iconID, group)
 	}
 
-	return f, nil
+	return f, iconID, nil
 }
